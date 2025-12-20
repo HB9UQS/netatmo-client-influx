@@ -244,7 +244,7 @@ if __name__ == "__main__":
             stations = api.get_stations()
 
 #v1
-           client = InfluxDBClient(
+            client = InfluxDBClient(
                 host=influx_host,
                 port=influx_port,
                 username=influx_username,
