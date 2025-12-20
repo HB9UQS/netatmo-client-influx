@@ -1,6 +1,6 @@
 services:
   influxdb:
-    image: docker.io/influxdb:2-alpine
+    image: docker.io/influxdb:1.12-alpine
     restart: unless-stopped
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
