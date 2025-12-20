@@ -253,92 +253,65 @@ if __name__ == "__main__":
                 ssl=influx_ssl
             )
 #
+            for station_id, station in stations.items():
+                measurements = []
 
-#v2
-#             with InfluxDBClient(
-#                url=f"{influx_protocol}://{influx_host}:{influx_port}",
-#                token=influx_token,
-#                org=influx_org,
-#                debug=True if debug_batch else False,
-#            ) as client:
-#                for _, _logger in client.conf.loggers.items():
-#                    _level = log_level if debug_batch else "NOTSET"
-#                    configure_logging(level=_level, logger=_logger)
-#
-#                with client.write_api(
-#                    success_callback=influx_callback.success,
-#                    error_callback=influx_callback.error,
-#                    retry_callback=influx_callback.retry,
-#                ) as write_client:
-#                    
-                    for station_id, station in stations.items():
-                        measurements = []
+                log.debug(f"Station Data: {station}")
+                home_name = station.get("home_name", "Unknown")
+                station_name = station.get("station_name", "Unknown")
+                station_module_name = station.get("module_name", "Unknown")
+                station_module_type = station.get("type", "Unknown")
+                station_place = station.get("place", {})
+                station_long_lat = station_place.get("location", [])
+   
+                station_data = {
+                    "altitude": station_place.get("altitude"),
+                    "country": station_place.get("country", "Unknown"),
+                    "city": station_place.get("city", "Unknown"),
+                    "timezone": station_place.get("timezone", "Unknown"),
+                    "longitude": safe_list_get(station_long_lat, 0),
+                    "latitude": safe_list_get(station_long_lat, 1),
+                }
 
-                        log.debug(f"Station Data: {station}")
-                        home_name = station.get("home_name", "Unknown")
-                        station_name = station.get("station_name", "Unknown")
-                        station_module_name = station.get("module_name", "Unknown")
-                        station_module_type = station.get("type", "Unknown")
-                        station_place = station.get("place", {})
-                        station_long_lat = station_place.get("location", [])
-
-                        station_data = {
-                            "altitude": station_place.get("altitude"),
-                            "country": station_place.get("country", "Unknown"),
-                            "city": station_place.get("city", "Unknown"),
-                            "timezone": station_place.get("timezone", "Unknown"),
-                            "longitude": safe_list_get(station_long_lat, 0),
-                            "latitude": safe_list_get(station_long_lat, 1),
+                for key, value in station_data.items():
+                    measurements.append(
+                        {
+                            "measurement": key,
+                            "tags": {"home": home_name, "station": station_name, "type": station_module_type},
+                            "fields": {"value": check_value(value)},
+                            "time": int(datetime.now(UTC).timestamp()),
                         }
+                    )
+                
+                station_sensor_data = station.get("dashboard_data")
+                
+                if station_sensor_data is None:
+                    continue
+                
+                for sensor in ["wifi_status", "reachable", "co2_calibrating"]:
+                    station_sensor_data.update({sensor: station.get(sensor)})
+                
+                measurements += get_sensor_data(
+                    station_sensor_data, home_name, station_name, station_module_name, station_module_type
+                )
+                
+                for module in station.get("modules", []):
+                    log.debug(f"Module Data: {module}")
+                    module_name = module.get("module_name")
+                    module_type = module.get("type")
 
-                        for key, value in station_data.items():
-                            measurements.append(
-                                {
-                                    "measurement": key,
-                                    "tags": {"home": home_name, "station": station_name, "type": station_module_type},
-                                    "fields": {"value": check_value(value)},
-                                    "time": int(datetime.now(UTC).timestamp()),
-                                }
-                            )
+                    module_sensor_data = module.get("dashboard_data")
+ 
+                    if module_sensor_data is None:
+                        continue
 
-                        station_sensor_data = station.get("dashboard_data")
-
-                        if station_sensor_data is None:
-                            continue
-
-                        for sensor in ["wifi_status", "reachable", "co2_calibrating"]:
-                            station_sensor_data.update({sensor: station.get(sensor)})
-
-                        measurements += get_sensor_data(
-                            station_sensor_data, home_name, station_name, station_module_name, station_module_type
-                        )
-
-                        for module in station.get("modules", []):
-                            log.debug(f"Module Data: {module}")
-                            module_name = module.get("module_name")
-                            module_type = module.get("type")
-
-                            module_sensor_data = module.get("dashboard_data")
-
-                            if module_sensor_data is None:
-                                continue
-
-                            for sensor in ["rf_status", "battery_vp", "battery_percent"]:
-                                module_sensor_data.update({sensor: module.get(sensor)})
-
-                            measurements += get_sensor_data(
-                                module_sensor_data, home_name, station_name, module_name, module_type
-                            )
-#v1
-
-                        client.write_points(measurements, time_precision="s", database=influx_db)
-#                        client.write_points(station_data, time_precision="s", database=influx_db)
-#                        client.write_points(module_data, time_precision="s", database=influx_db)
-
-                        # noinspection PyTypeChecker
-#                        write_client.write(
-#                            bucket=influx_bucket, org=influx_org, record=measurements, write_precision=WritePrecision.S
-#                        )
+                    for sensor in ["rf_status", "battery_vp", "battery_percent"]:
+                        module_sensor_data.update({sensor: module.get(sensor)})
+  
+                    measurements += get_sensor_data(
+                        module_sensor_data, home_name, station_name, module_name, module_type
+                    )
+                client.write_points(measurements, time_precision="s", database=influx_db)
         except (json.decoder.JSONDecodeError, requests.exceptions.JSONDecodeError) as error:
             log.error(f"JSON Decode Error. Retry in {interval} second(s)...")
             log.debug(error)

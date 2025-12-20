@@ -28,9 +28,9 @@ services:
       - INFLUX_HOST=influxdb
       - INFLUX_PORT=8086
       - INFLUX_DB=netatmo
-      - INFLUX_SSL=N
+      - INFLUX_SSL=False
       - INFLUX_USERNAME=user
-      - INFLUX_PASSWORD=pass
+      - INFLUX_PASSWORDUSER=pass
     volumes:
       - ./src/config.yaml:/app/config.yaml:rw
       - data:/app/data:rw
