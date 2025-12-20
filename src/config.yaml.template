@@ -9,7 +9,8 @@ netatmo:
 influx:
   influx_host: ""
   influx_port: ""
-  influx_bucket: ""
-  influx_protocol: ""
-  influx_token: ""
-  influx_org: ""
+  influx_db: ""
+  influx_ssl: ""
+  influx_username: ""
+  influx_password: ""
+  

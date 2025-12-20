@@ -14,8 +14,13 @@ from typing import Dict, Optional, Union
 
 import requests
 import yaml
-from influxdb_client import InfluxDBClient, WritePrecision
-from influxdb_client.client.exceptions import InfluxDBError
+
+#V1 
+from influxdb import InfluxDBClient
+#v2
+#from influxdb_client import InfluxDBClient, WritePrecision
+#from influxdb_client.client.exceptions import InfluxDBError
+#
 
 from helpers import configure_logging
 from netatmo_api import (
@@ -152,10 +157,17 @@ if __name__ == "__main__":
     refresh_token = None
     influx_host = None
     influx_port = None
-    influx_bucket = None
-    influx_protocol = None
-    influx_token = None
-    influx_org = None
+#v1
+    influx_db = None
+    influx_ssl = None
+    influx_username = None
+    influx_password = None
+#v2
+#    influx_bucket = None
+#    influx_protocol = None
+#    influx_token = None
+#    influx_org = None
+ #
     influx_callback = BatchingCallback()
     args = parse_args()
     config = parse_config(args.config_file)
@@ -178,10 +190,16 @@ if __name__ == "__main__":
     if "influx" in config:
         influx_host = config.get("influx").get("influx_host", "localhost")
         influx_port = config.get("influx").get("influx_port", "8086")
-        influx_bucket = config.get("influx").get("influx_bucket", "netatmo")
-        influx_protocol = config.get("influx").get("influx_protocol", "http")
-        influx_token = config.get("influx").get("influx_token", None)
-        influx_org = config.get("influx").get("influx_org", None)
+# v1
+        influx_db = config.get("influx").get("influx_db","netatmo")
+        influx_ssl = config.get("influx").get("influx_ssl","n")
+        influx_username = config.get("influx").get("influx_username","user")
+        influx_password = config.get("influx").get("influx_password","pass")
+#
+#        influx_bucket = config.get("influx").get("influx_bucket", "netatmo")
+#        influx_protocol = config.get("influx").get("influx_protocol", "http")
+#        influx_token = config.get("influx").get("influx_token", None)
+#        influx_org = config.get("influx").get("influx_org", None)
 
     # Environment Variables takes precedence over config if set
     # global
@@ -196,10 +214,16 @@ if __name__ == "__main__":
     # influx
     influx_host = getenv("INFLUX_HOST", influx_host)
     influx_port = getenv("INFLUX_PORT", influx_port)
-    influx_bucket = getenv("INFLUX_BUCKET", influx_bucket)
-    influx_protocol = getenv("INFLUX_PROTOCOL", influx_protocol)
-    influx_token = getenv("INFLUX_TOKEN", influx_token)
-    influx_org = getenv("INFLUX_ORG", influx_org)
+#v1
+    influx_db = getenv("INFLUX_DB", influx_db)
+    influx_ssl = getenv("INFLUX_SSL", influx_ssl)
+    influx_username = getenv("INFLUX_USERNAME", influx_username)
+    influx_password = getenv("INFLUX_PASSWORD", influx_password)
+#
+#    influx_bucket = getenv("INFLUX_BUCKET", influx_bucket)
+#    influx_protocol = getenv("INFLUX_PROTOCOL", influx_protocol)
+ #   influx_token = getenv("INFLUX_TOKEN", influx_token)
+ #   influx_org = getenv("INFLUX_ORG", influx_org)
 
     # set logging level
     logger = logging.getLogger(__name__)
@@ -219,21 +243,34 @@ if __name__ == "__main__":
             api.get_stations_data()
             stations = api.get_stations()
 
-            with InfluxDBClient(
-                url=f"{influx_protocol}://{influx_host}:{influx_port}",
-                token=influx_token,
-                org=influx_org,
-                debug=True if debug_batch else False,
-            ) as client:
-                for _, _logger in client.conf.loggers.items():
-                    _level = log_level if debug_batch else "NOTSET"
-                    configure_logging(level=_level, logger=_logger)
+#v1
+           client = InfluxDBClient(
+                host=influx_host,
+                port=influx_port,
+                username=influx_username,
+                password=influx_password,
+                database=influx_db,
+                ssl=influx_ssl
+            )
+#
 
-                with client.write_api(
-                    success_callback=influx_callback.success,
-                    error_callback=influx_callback.error,
-                    retry_callback=influx_callback.retry,
-                ) as write_client:
+#v2
+#             with InfluxDBClient(
+#                url=f"{influx_protocol}://{influx_host}:{influx_port}",
+#                token=influx_token,
+#                org=influx_org,
+#                debug=True if debug_batch else False,
+#            ) as client:
+#                for _, _logger in client.conf.loggers.items():
+#                    _level = log_level if debug_batch else "NOTSET"
+#                    configure_logging(level=_level, logger=_logger)
+#
+#                with client.write_api(
+#                    success_callback=influx_callback.success,
+#                    error_callback=influx_callback.error,
+#                    retry_callback=influx_callback.retry,
+#                ) as write_client:
+#                    
                     for station_id, station in stations.items():
                         measurements = []
 
@@ -292,11 +329,16 @@ if __name__ == "__main__":
                             measurements += get_sensor_data(
                                 module_sensor_data, home_name, station_name, module_name, module_type
                             )
+#v1
+
+                        client.write_points(measurements, time_precision="s", database=influx_db)
+#                        client.write_points(station_data, time_precision="s", database=influx_db)
+#                        client.write_points(module_data, time_precision="s", database=influx_db)
 
                         # noinspection PyTypeChecker
-                        write_client.write(
-                            bucket=influx_bucket, org=influx_org, record=measurements, write_precision=WritePrecision.S
-                        )
+#                        write_client.write(
+#                            bucket=influx_bucket, org=influx_org, record=measurements, write_precision=WritePrecision.S
+#                        )
         except (json.decoder.JSONDecodeError, requests.exceptions.JSONDecodeError) as error:
             log.error(f"JSON Decode Error. Retry in {interval} second(s)...")
             log.debug(error)

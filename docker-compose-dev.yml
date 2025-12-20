@@ -27,9 +27,10 @@ services:
     environment:
       - INFLUX_HOST=influxdb
       - INFLUX_PORT=8086
-      - INFLUX_BUCKET=netatmo
-      - INFLUX_PROTOCOL=http
-      - INFLUX_TOKEN=myverysecuretoken
+      - INFLUX_DB=netatmo
+      - INFLUX_SSL=N
+      - INFLUX_USERNAME=user
+      - INFLUX_PASSWORD=pass
     volumes:
       - ./src/config.yaml:/app/config.yaml:rw
       - data:/app/data:rw
