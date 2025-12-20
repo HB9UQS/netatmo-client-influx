@@ -37,35 +37,6 @@ class VerbosityLevel(Enum):
     INFO = 2
     DEBUG = 3
 
-
-class BatchingCallback(object):
-    @staticmethod
-    def success(conf: tuple[str, str, str], data: str):
-        log.info(f"Written batch with size {len(data)}.")
-        if debug_batch:
-            log.debug(f"Batch: {conf}, Data: {data}")
-
-    @staticmethod
-    def error(conf: tuple[str, str, str], data: str, exception: InfluxDBError):
-        if type(exception) is InfluxDBError and exception.response is not None:
-            log.error(f"Cannot write batch due: {exception.response.status} - {exception.response.reason}")
-        else:
-            log.error(f"Cannot write batch due: {exception}")
-        if debug_batch:
-            log.debug(f"Batch: {conf}, Data: {data}, Exception: {exception}")
-
-    @staticmethod
-    def retry(conf: tuple[str, str, str], data: str, exception: InfluxDBError):
-        if type(exception) is InfluxDBError and exception.response is not None:
-            log.warning(
-                f"Retryable error occurs for batch, retry: {exception.response.status} - {exception.response.reason}"
-            )
-        else:
-            log.warning(f"Retryable error occurs for batch, retry: {exception}")
-        if debug_batch:
-            log.debug(f"Batch: {conf}, Data: {data}, Exception: {exception}")
-
-
 def parse_config(_config_file=None) -> Dict:
     if _config_file is None:
         _config_file = Path(__file__).parent / "config.yaml"
@@ -157,18 +128,11 @@ if __name__ == "__main__":
     refresh_token = None
     influx_host = None
     influx_port = None
-#v1
     influx_db = None
     influx_ssl = None
     influx_username = None
     influx_password = None
-#v2
-#    influx_bucket = None
-#    influx_protocol = None
-#    influx_token = None
-#    influx_org = None
- #
-    influx_callback = BatchingCallback()
+
     args = parse_args()
     config = parse_config(args.config_file)
 
