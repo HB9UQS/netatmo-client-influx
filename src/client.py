@@ -254,10 +254,12 @@ if __name__ == "__main__":
                     )
                 
                 station_sensor_data = station.get("dashboard_data")
-                
+
                 if station_sensor_data is None:
-                    continue
-                
+                    # unreachable station: no readings, but still record its status and handle its modules
+                    log.warning(f"No data from station {station_name}, writing status only")
+                    station_sensor_data = {"time_utc": int(datetime.now(UTC).timestamp())}
+
                 for sensor in ["wifi_status", "reachable", "co2_calibrating"]:
                     station_sensor_data.update({sensor: station.get(sensor)})
                 
@@ -271,11 +273,12 @@ if __name__ == "__main__":
                     module_type = module.get("type")
 
                     module_sensor_data = module.get("dashboard_data")
- 
-                    if module_sensor_data is None:
-                        continue
 
-                    for sensor in ["rf_status", "battery_vp", "battery_percent"]:
+                    if module_sensor_data is None:
+                        log.warning(f"No data from module {module_name}, writing status only")
+                        module_sensor_data = {"time_utc": int(datetime.now(UTC).timestamp())}
+
+                    for sensor in ["rf_status", "battery_vp", "battery_percent", "reachable"]:
                         module_sensor_data.update({sensor: module.get(sensor)})
   
                     measurements += get_sensor_data(
