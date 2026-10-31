@@ -314,7 +314,7 @@ class NetatmoWeatherStationAPI:
                     raise NetatmoAccessTokenInvalid(f"Access token rejected (code {error_code})")
                 if error_code == 1:  # access token missing
                     raise NetatmoAuthError("Access token missing")
-           except ValueError:
+            except ValueError:
                 pass
             raise NetatmoAPIError("Access forbidden (403)")
 

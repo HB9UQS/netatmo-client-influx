@@ -7,7 +7,7 @@ to **InfluxDB 1.x**.
 
 
 
-![netatmo-influx-datenfluss.svg](C:\DriveI\VSCode\netatmo-client-influx\netatmo-influx-datenfluss.svg)
+![netatmo-influx-datenfluss.svg](./netatmo-influx-datenfluss.svg)
 
 
 
