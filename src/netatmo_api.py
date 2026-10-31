@@ -33,6 +33,12 @@ class NetatmoAuthErrorTokenExpired(Exception):
     pass
 
 
+class NetatmoAccessTokenInvalid(NetatmoAuthError):
+    """Exception raised when the API rejects the access token as invalid or expired."""
+
+    pass
+
+
 class NetatmoAPIError(Exception):
     """Base exception for Netatmo API errors."""
 
@@ -137,7 +143,7 @@ class NetatmoAuth:
             _token = {
                 "access_token": self.access_token,
                 "refresh_token": self.refresh_token,
-                "expiration": self.token_expires_at,
+                "expires_at": self.token_expires_at,
             }
             with open(self.token_file, "w") as _f:
                 _f.write(json.dumps(_token, indent=2))
@@ -203,7 +209,18 @@ class NetatmoWeatherStationAPI:
                 timeout=10,
             )
 
-            self._handle_response_errors(response)
+            try:
+                self._handle_response_errors(response)
+            except NetatmoAccessTokenInvalid:
+                # the stored expiry can be wrong (e.g. token revoked); refresh once and retry
+                self.log.info("Access token rejected by API, refreshing and retrying...")
+                self.auth.refresh()
+                response = requests.post(
+                    NETATMO_STATIONS_DATA_ENDPOINT,
+                    headers=self.auth.headers,
+                    timeout=10,
+                )
+                self._handle_response_errors(response)
 
             data = response.json()
             self.stations_data = data.get("body", {}).get("devices", [])
@@ -293,9 +310,11 @@ class NetatmoWeatherStationAPI:
             try:
                 error_data = response.json()
                 error_code = error_data.get("error", {}).get("code")
-                if error_code == 1:  # Invalid access token
-                    raise NetatmoAuthError("Invalid access token")
-            except ValueError:
+                if error_code in (2, 3):  # 2: invalid access token, 3: access token expired
+                    raise NetatmoAccessTokenInvalid(f"Access token rejected (code {error_code})")
+                if error_code == 1:  # access token missing
+                    raise NetatmoAuthError("Access token missing")
+           except ValueError:
                 pass
             raise NetatmoAPIError("Access forbidden (403)")
 
