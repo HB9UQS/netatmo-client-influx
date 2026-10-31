@@ -67,6 +67,18 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build image for the smoke test
+        uses: docker/build-push-action@v6
+        with:
+          tags: netatmo-client-influx:smoke-test
+          cache-from: type=gha
+          load: true
+          push: false
+      - name: Smoke test
+        # the image must start the client and be able to write its token file
+        run: |
+          docker run --rm netatmo-client-influx:smoke-test uv run --no-sync client.py --help
+          docker run --rm netatmo-client-influx:smoke-test sh -c 'touch data/token.json && echo data/ is writable'
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
