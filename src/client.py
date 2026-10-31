@@ -102,6 +102,9 @@ def get_sensor_data(
                 "date_min_temp": _sensor_data.pop("date_min_temp"),
             }
         for _sensor, _value in _sensor_data.items():
+            # a point without a field value is invalid line protocol and makes InfluxDB reject the whole write
+            if _value is None:
+                continue
             _measurements.append(
                 {
                     "measurement": _sensor.lower() if _sensor.lower() != "wifi_status" else "rf_status",
@@ -239,6 +242,8 @@ if __name__ == "__main__":
                 }
 
                 for key, value in station_data.items():
+                    if value is None:
+                        continue
                     measurements.append(
                         {
                             "measurement": key,
