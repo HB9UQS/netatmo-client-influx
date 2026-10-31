@@ -1,18 +1,21 @@
+# Local development: builds the image from source and starts it with an InfluxDB 1.x.
+# Put the Netatmo credentials into a .env file next to this file:
+#   NETATMO_CLIENT_ID=...
+#   NETATMO_CLIENT_SECRET=...
+#   NETATMO_REFRESH_TOKEN=...
 services:
   influxdb:
     image: docker.io/influxdb:1.12-alpine
     restart: unless-stopped
     environment:
-      - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=netatmo
-      - DOCKER_INFLUXDB_INIT_PASSWORD=mysupersecurepassword
-      - DOCKER_INFLUXDB_INIT_ORG=netatmo-org
-      - DOCKER_INFLUXDB_INIT_BUCKET=netatmo
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=myverysecuretoken
+      # creates the database on first start; no authentication for local development
+      - INFLUXDB_DB=netatmo
     ports:
       - "8086:8086"
+    volumes:
+      - influxdb:/var/lib/influxdb
     healthcheck:
-      test: "curl -f http://localhost:8086/ping"
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8086/ping"]
       interval: 5s
       timeout: 10s
       retries: 5
@@ -25,18 +28,24 @@ services:
     image: localhost/netatmo-client-influx
     restart: unless-stopped
     environment:
+      - INTERVAL=600
+      - LOGLEVEL=DEBUG
+      - NETATMO_CLIENT_ID=${NETATMO_CLIENT_ID}
+      - NETATMO_CLIENT_SECRET=${NETATMO_CLIENT_SECRET}
+      - NETATMO_REFRESH_TOKEN=${NETATMO_REFRESH_TOKEN}
       - INFLUX_HOST=influxdb
       - INFLUX_PORT=8086
       - INFLUX_DB=netatmo
-      - INFLUX_SSL=False
-      - INFLUX_USERNAME=user
-      - INFLUX_PASSWORDUSER=pass
+      - INFLUX_SSL=false
+      # empty credentials: the development InfluxDB above runs without authentication
+      - INFLUX_USERNAME=
+      - INFLUX_PASSWORD=
     volumes:
-      - ./src/config.yaml:/app/config.yaml:rw
-      - data:/app/data:rw
+      - data:/app/data
     depends_on:
       influxdb:
         condition: service_healthy
 
 volumes:
+  influxdb:
   data:

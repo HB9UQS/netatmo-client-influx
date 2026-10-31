@@ -13,7 +13,6 @@ from requests import Response
 from helpers import configure_logging
 
 # Netatmo API endpoints
-NETATMO_AUTH_URL = "https://api.netatmo.com/oauth2/authorize"
 NETATMO_TOKEN_URL = "https://api.netatmo.com/oauth2/token"
 NETATMO_API_BASE_URL = "https://api.netatmo.com/api"
 NETATMO_STATIONS_DATA_ENDPOINT = f"{NETATMO_API_BASE_URL}/getstationsdata"
@@ -176,7 +175,6 @@ class NetatmoWeatherStationAPI:
         self.log = log
         self.auth = auth
         self.stations_data: dict[str, Any] = {}
-        self.stations_status: dict[str, Any] = {}
 
     def get_stations_data(self) -> dict[str, Any]:
         """

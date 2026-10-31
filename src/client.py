@@ -12,15 +12,9 @@ from pathlib import Path
 
 import requests
 import yaml
-
-# V1
 from influxdb import InfluxDBClient
 from influxdb.exceptions import InfluxDBClientError, InfluxDBServerError
 
-# v2
-# from influxdb_client import InfluxDBClient, WritePrecision
-# from influxdb_client.client.exceptions import InfluxDBError
-#
 from helpers import configure_logging
 from netatmo_api import (
     NetatmoAPI,
@@ -62,7 +56,6 @@ def parse_args():
     parser.add_argument("-c", "--config-file", dest="config_file", type=str, nargs="?", required=False, default=None)
     parser.add_argument("-t", "--token-file", dest="token_file", type=str, nargs="?", default="data/token.json")
     parser.add_argument("-v", "--verbose", dest="verbosity", action="count", default=0)
-    parser.add_argument("--debug-batch", dest="debug_batch", action="store_true", default=False)
 
     return parser.parse_args()
 
@@ -162,7 +155,6 @@ if __name__ == "__main__":
 
     interval = int(config.get("interval", "300"))  # interval in seconds; default are 5 Minutes
     log_level = config.get("loglevel", "INFO")  # set loglevel by Name
-    debug_batch = config.get("debug_batch", args.debug_batch)  # set loglevel for batching (influx)
 
     if "netatmo" in config:
         client_id = config.get("netatmo").get("client_id", None)
@@ -172,22 +164,15 @@ if __name__ == "__main__":
     if "influx" in config:
         influx_host = config.get("influx").get("influx_host", "localhost")
         influx_port = config.get("influx").get("influx_port", "8086")
-        # v1
         influx_db = config.get("influx").get("influx_db", "netatmo")
         influx_ssl = config.get("influx").get("influx_ssl", "n")
         influx_username = config.get("influx").get("influx_username", "user")
         influx_password = config.get("influx").get("influx_password", "pass")
-    #
-    #        influx_bucket = config.get("influx").get("influx_bucket", "netatmo")
-    #        influx_protocol = config.get("influx").get("influx_protocol", "http")
-    #        influx_token = config.get("influx").get("influx_token", None)
-    #        influx_org = config.get("influx").get("influx_org", None)
 
     # Environment Variables takes precedence over config if set
     # global
     interval = int(getenv("INTERVAL", interval))
     log_level = getenv("LOGLEVEL", VerbosityLevel(args.verbosity).name if args.verbosity > 0 else log_level)
-    debug_batch = getenv("DEBUG_BATCH", debug_batch)
     # netatmo
     client_id = getenv("NETATMO_CLIENT_ID", client_id)
     client_secret = getenv("NETATMO_CLIENT_SECRET", client_secret)
@@ -196,16 +181,10 @@ if __name__ == "__main__":
     # influx
     influx_host = getenv("INFLUX_HOST", influx_host)
     influx_port = getenv("INFLUX_PORT", influx_port)
-    # v1
     influx_db = getenv("INFLUX_DB", influx_db)
     influx_ssl = getenv("INFLUX_SSL", influx_ssl)
     influx_username = getenv("INFLUX_USERNAME", influx_username)
     influx_password = getenv("INFLUX_PASSWORD", influx_password)
-    #
-    #    influx_bucket = getenv("INFLUX_BUCKET", influx_bucket)
-    #    influx_protocol = getenv("INFLUX_PROTOCOL", influx_protocol)
-    #   influx_token = getenv("INFLUX_TOKEN", influx_token)
-    #   influx_org = getenv("INFLUX_ORG", influx_org)
 
     # set logging level
     logger = logging.getLogger(__name__)
@@ -219,7 +198,7 @@ if __name__ == "__main__":
         log_level=log_level,
     )
 
-    # v1; the client does not connect on creation, so one instance serves all runs
+    # the client does not connect on creation, so one instance serves all runs
     client = InfluxDBClient(
         host=influx_host,
         port=influx_port,
