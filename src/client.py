@@ -5,11 +5,12 @@ import json
 import logging
 import signal
 import sys
+import threading
+import time
 from datetime import UTC, datetime
 from enum import Enum
 from os import getenv
 from pathlib import Path
-from time import sleep
 
 import requests
 import yaml
@@ -80,9 +81,19 @@ def check_value(_val: float | str) -> float | str:
     return _val
 
 
-def shutdown(_signal):
-    global running
-    running = False
+stop = threading.Event()
+
+
+def shutdown(_signum, _frame):
+    # signal handlers are called with (signum, frame)
+    stop.set()
+
+
+def wait(seconds: float) -> None:
+    # wait in short slices: a signal handler only runs between them on some platforms (e.g. Windows)
+    deadline = time.monotonic() + seconds
+    while not stop.is_set() and (remaining := deadline - time.monotonic()) > 0:
+        stop.wait(min(remaining, 1))
 
 
 def get_sensor_data(
@@ -126,7 +137,6 @@ def get_sensor_data(
 
 
 if __name__ == "__main__":
-    running = True
     client_id = None
     client_secret = None
     refresh_token = None
@@ -140,11 +150,9 @@ if __name__ == "__main__":
     args = parse_args()
     config = parse_config(args.config_file)
 
-    if getenv("TERM", None):
-        # noinspection PyTypeChecker
-        signal.signal(signal.SIGTERM, shutdown)
-        # noinspection PyTypeChecker
-        signal.signal(signal.SIGINT, shutdown)
+    # always handle SIGTERM: docker stop sends it and kills the process 10 s later
+    signal.signal(signal.SIGTERM, shutdown)
+    signal.signal(signal.SIGINT, shutdown)
 
     interval = int(config.get("interval", "300"))  # interval in seconds; default are 5 Minutes
     log_level = config.get("loglevel", "INFO")  # set loglevel by Name
@@ -206,7 +214,7 @@ if __name__ == "__main__":
     )
 
     log.info("Netatmo Crawler ready...")
-    while running:
+    while not stop.is_set():
         try:
             api.get_stations_data()
             stations = api.get_stations()
@@ -304,4 +312,5 @@ if __name__ == "__main__":
             # last resort: keep the loop alive and log the traceback
             log.exception(f"Unexpected error. Retry in {interval} second(s)...")
         finally:
-            sleep(interval)
+            wait(interval)
+    log.info("Netatmo Crawler stopped.")
