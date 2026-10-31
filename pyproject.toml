@@ -1,6 +1,6 @@
 [project]
 name = "netatmo-client-influx"
-version = "4.1.1"
+version = "5.0.0"
 description = "Docker container that fetches netatmo weather station data and stores them in InfluxDB 1.x"
 authors = [
     { name = "Dennis Bernardy", email = "dennis@ethernerd.net" },
