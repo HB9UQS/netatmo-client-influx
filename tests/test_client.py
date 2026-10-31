@@ -6,6 +6,13 @@ from influxdb.line_protocol import make_lines
 from client import get_sensor_data, short, to_bool
 
 
+def test_missing_date_of_extreme_falls_back_to_measurement_time():
+    data = {"time_utc": NOW, "WindStrength": 12, "max_wind_str": 30}
+    result = points(data, module_type="NAModule2")
+    assert result["max_wind_str"]["time"] == NOW
+    assert result["windstrength"]["time"] == NOW
+
+
 def test_short_keeps_one_line_and_limits_length():
     assert short(ValueError("API request failed\n  with status 500")) == "API request failed with status 500"
     long_text = short(ValueError("<html>" + "x" * 1000 + "</html>"))

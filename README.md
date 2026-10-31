@@ -141,7 +141,7 @@ each version tag). A complete setup with InfluxDB 1.x:
 ```yaml
 services:
   influxdb:
-    image: docker.io/influxdb:1.11-alpine
+    image: docker.io/influxdb:1.12-alpine
     restart: unless-stopped
     environment:
       - INFLUXDB_DB=netatmo
