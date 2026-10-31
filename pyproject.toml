@@ -1,9 +1,10 @@
 [project]
 name = "netatmo-client-influx"
-version = "4.0.0"
-description = "A basic crawler for netatmo api"
+version = "4.1.1"
+description = "Docker container that fetches netatmo weather station data and stores them in IndfluxDB1.x"
 authors = [
-    { name = "Dennis Bernardy", email = "dennis@ethernerd.net" }
+    { name = "Dennis Bernardy", email = "dennis@ethernerd.net" }, 
+    { name = "HB9UQS", email = "110497781+HB9UQS@users.noreply.github.com"  } 
 ]
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
