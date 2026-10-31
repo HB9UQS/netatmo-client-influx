@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Implements OAuth2 token refresh and weather station data fetching.
 """
