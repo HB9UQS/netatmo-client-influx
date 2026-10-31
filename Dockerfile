@@ -25,5 +25,12 @@ RUN --mount=type=cache,uid=${UID},target=/app/.cache \
     uv sync --locked --no-dev && \
     mkdir -p /app/data
 
+# After every run that fetched and wrote all data, the client writes the Unix time until which it
+# counts as healthy into this file (two intervals plus a minute). The check fails while the file is
+# missing or that time has passed, e.g. because the token expired or InfluxDB is unreachable.
+ENV HEARTBEAT_FILE=/tmp/netatmo-heartbeat
+HEALTHCHECK --interval=60s --timeout=5s --start-period=60s --retries=3 \
+    CMD test "$(date +%s)" -lt "$(cat "$HEARTBEAT_FILE" 2>/dev/null || echo 0)"
+
 # --no-sync: start with the environment built above, never resolve or download at runtime
 CMD [ "uv", "run", "--no-sync", "client.py" ]

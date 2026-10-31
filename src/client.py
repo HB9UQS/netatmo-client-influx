@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import os
 import signal
 import sys
 import threading
@@ -84,6 +85,15 @@ def short(_error: Exception, _limit: int = 300) -> str:
     # one line, at most _limit characters
     _text = " ".join(str(_error).split())
     return _text if len(_text) <= _limit else _text[: _limit - 3] + "..."
+
+
+def write_heartbeat(_path: str, _valid_for: float) -> None:
+    # the file holds the Unix time until which the client counts as healthy; it is replaced
+    # atomically so the Docker health check never reads a half-written number
+    _tmp = f"{_path}.tmp"
+    with open(_tmp, "w", encoding="utf-8") as _f:
+        _f.write(f"{int(time.time() + _valid_for)}\n")
+    os.replace(_tmp, _path)
 
 
 stop = threading.Event()
@@ -192,6 +202,8 @@ if __name__ == "__main__":
     influx_ssl = getenv("INFLUX_SSL", influx_ssl)
     influx_username = getenv("INFLUX_USERNAME", influx_username)
     influx_password = getenv("INFLUX_PASSWORD", influx_password)
+    # optional; the Docker image sets it and its HEALTHCHECK reads the file
+    heartbeat_file = getenv("HEARTBEAT_FILE")
 
     # set logging level
     logger = logging.getLogger(__name__)
@@ -215,11 +227,16 @@ if __name__ == "__main__":
         ssl=to_bool(influx_ssl),
     )
 
+    if heartbeat_file:
+        # a heartbeat left over from before a container restart must not report a healthy state
+        Path(heartbeat_file).unlink(missing_ok=True)
+
     log.info("Netatmo Crawler ready...")
     while not stop.is_set():
         try:
             api.get_stations_data()
             stations = api.get_stations()
+            run_ok = True
 
             for station in stations.values():
                 measurements = []
@@ -289,6 +306,14 @@ if __name__ == "__main__":
                     client.write_points(measurements, time_precision="s", database=influx_db)
                 except (InfluxDBClientError, InfluxDBServerError, requests.exceptions.RequestException) as error:
                     log.error(f"Cannot write to InfluxDB for station {station_name}: {error}")
+                    run_ok = False
+
+            if heartbeat_file and run_ok:
+                try:
+                    # healthy until two runs plus a minute of slack have been missed
+                    write_heartbeat(heartbeat_file, 2 * interval + 60)
+                except OSError as error:
+                    log.warning(f"Cannot write heartbeat file {heartbeat_file}: {error}")
         # the cause goes into the error line; API errors can carry a whole HTML page, so it is shortened
         except (json.decoder.JSONDecodeError, requests.exceptions.JSONDecodeError) as error:
             log.error(f"JSON Decode Error: {short(error)}. Retry in {interval} second(s)...")

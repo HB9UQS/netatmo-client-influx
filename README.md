@@ -183,6 +183,22 @@ directory writable for that user first: `mkdir data && sudo chown 10001 data`.
 The image is built with `uv sync --locked` and starts with `uv run --no-sync`, so the container never
 resolves or downloads packages at runtime. `docker stop` ends it cleanly.
 
+#### Health check
+
+The image has a Docker `HEALTHCHECK`. After every run in which the client fetched the data from Netatmo
+and wrote everything to InfluxDB, it renews a heartbeat file (`HEARTBEAT_FILE`, `/tmp/netatmo-heartbeat`
+in the image). The container turns **unhealthy** when no such run happened for two intervals plus a
+minute, e.g. because the refresh token expired or InfluxDB is unreachable, and is **healthy** again after
+the next good run. A process that is running but no longer delivers data thus becomes visible:
+
+```bash
+docker ps                                   # STATUS shows (healthy) / (unhealthy)
+docker inspect --format '{{json .State.Health}}' <container>
+```
+
+`restart: unless-stopped` does not restart an unhealthy container; the log tells why runs fail.
+Outside Docker no heartbeat is written unless `HEARTBEAT_FILE` is set.
+
 `docker-compose-dev.yml` builds the image from source for local development.
 
 ## Data in InfluxDB

@@ -79,6 +79,12 @@ jobs:
         run: |
           docker run --rm netatmo-client-influx:smoke-test uv run --no-sync client.py --help
           docker run --rm netatmo-client-influx:smoke-test sh -c 'touch data/token.json && echo data/ is writable'
+          # run the image's own HEALTHCHECK command: failing without heartbeat, passing with a fresh one
+          hc=$(docker inspect --format '{{index .Config.Healthcheck.Test 1}}' netatmo-client-influx:smoke-test)
+          docker run --rm -e HC="$hc" netatmo-client-influx:smoke-test \
+            sh -c 'if eval "$HC"; then exit 1; fi; echo unhealthy without heartbeat'
+          docker run --rm -e HC="$hc" netatmo-client-influx:smoke-test \
+            sh -c 'echo $(( $(date +%s) + 60 )) > "$HEARTBEAT_FILE" && eval "$HC" && echo healthy with fresh heartbeat'
       - name: Build and push
         uses: docker/build-push-action@v6
         with:

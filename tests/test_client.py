@@ -1,9 +1,21 @@
 """Conversion of Netatmo dashboard data into InfluxDB points."""
 
+import time
+
 import pytest
 from influxdb.line_protocol import make_lines
 
-from client import get_sensor_data, short, to_bool
+from client import get_sensor_data, short, to_bool, write_heartbeat
+
+
+def test_heartbeat_holds_the_time_until_healthy(tmp_path):
+    path = tmp_path / "heartbeat"
+    before = int(time.time())
+    write_heartbeat(str(path), 660)
+    valid_until = int(path.read_text())
+    assert before + 660 <= valid_until <= int(time.time()) + 660
+    # replaced atomically, no temporary file left behind
+    assert [p.name for p in tmp_path.iterdir()] == ["heartbeat"]
 
 
 def test_missing_date_of_extreme_falls_back_to_measurement_time():
