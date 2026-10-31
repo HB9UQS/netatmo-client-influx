@@ -1,8 +1,20 @@
 """Conversion of Netatmo dashboard data into InfluxDB points."""
 
+import pytest
 from influxdb.line_protocol import make_lines
 
-from client import get_sensor_data
+from client import get_sensor_data, to_bool
+
+
+@pytest.mark.parametrize("value", [True, "true", "True", "1", "yes", "y", "on"])
+def test_to_bool_true(value):
+    assert to_bool(value) is True
+
+
+@pytest.mark.parametrize("value", [False, None, "", "false", "False", "0", "n", "no", "off"])
+def test_to_bool_false(value):
+    assert to_bool(value) is False
+
 
 NOW = 1761900000
 

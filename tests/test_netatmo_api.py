@@ -79,3 +79,11 @@ def test_rejected_token_is_refreshed_and_the_call_retried(token_file):
 def test_second_rejection_raises_instead_of_looping(token_file):
     with pytest.raises(na.NetatmoAuthError):
         run(token_file, [EXPIRED, token(3), EXPIRED])
+
+
+def test_expired_refresh_token_raises_its_own_error(tmp_path):
+    path = tmp_path / "token.json"
+    path.write_text(json.dumps({"access_token": "old", "refresh_token": "dead", "expires_at": time.time() - 5}))
+    invalid_grant = FakeResponse(400, {"error": "invalid_grant"})
+    with pytest.raises(na.NetatmoAuthErrorTokenExpired):
+        run(str(path), [invalid_grant])

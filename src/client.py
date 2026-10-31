@@ -28,6 +28,7 @@ from netatmo_api import (
     NetatmoAPI,
     NetatmoAPIError,
     NetatmoAuthError,
+    NetatmoAuthErrorTokenExpired,
     NetatmoThrottlingError,
 )
 
@@ -79,6 +80,13 @@ def check_value(_val: float | str) -> float | str:
     if type(_val) is int:
         return float(_val)
     return _val
+
+
+def to_bool(_val) -> bool:
+    # config and environment deliver strings; "False" or "n" must not count as true
+    if isinstance(_val, bool):
+        return _val
+    return str(_val).strip().lower() in ("1", "true", "yes", "y", "on")
 
 
 stop = threading.Event()
@@ -213,21 +221,22 @@ if __name__ == "__main__":
         log_level=log_level,
     )
 
+    # v1; the client does not connect on creation, so one instance serves all runs
+    client = InfluxDBClient(
+        host=influx_host,
+        port=influx_port,
+        username=influx_username,
+        password=influx_password,
+        database=influx_db,
+        ssl=to_bool(influx_ssl),
+    )
+
     log.info("Netatmo Crawler ready...")
     while not stop.is_set():
         try:
             api.get_stations_data()
             stations = api.get_stations()
 
-            # v1
-            client = InfluxDBClient(
-                host=influx_host,
-                port=influx_port,
-                username=influx_username,
-                password=influx_password,
-                database=influx_db,
-                ssl=influx_ssl,
-            )
             for station in stations.values():
                 measurements = []
 
@@ -308,9 +317,16 @@ if __name__ == "__main__":
         except NetatmoAuthError as error:
             log.error(f"Auth Error. Retry in {interval} second(s)...")
             log.debug(error)
+        except NetatmoAuthErrorTokenExpired:
+            log.error(
+                "Refresh token expired. Generate a new one in the Netatmo developer console, set it as "
+                f"NETATMO_REFRESH_TOKEN and delete {args.token_file} (it takes precedence over the config). "
+                f"Retry in {interval} second(s)..."
+            )
         except Exception:
             # last resort: keep the loop alive and log the traceback
             log.exception(f"Unexpected error. Retry in {interval} second(s)...")
         finally:
             wait(interval)
+    client.close()
     log.info("Netatmo Crawler stopped.")
