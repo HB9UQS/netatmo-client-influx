@@ -15,8 +15,9 @@ from typing import Dict, Optional, Union
 import requests
 import yaml
 
-#V1 
+#V1
 from influxdb import InfluxDBClient
+from influxdb.exceptions import InfluxDBClientError, InfluxDBServerError
 #v2
 #from influxdb_client import InfluxDBClient, WritePrecision
 #from influxdb_client.client.exceptions import InfluxDBError
@@ -275,7 +276,11 @@ if __name__ == "__main__":
                     measurements += get_sensor_data(
                         module_sensor_data, home_name, station_name, module_name, module_type
                     )
-                client.write_points(measurements, time_precision="s", database=influx_db)
+                # a failed write must not stop the crawler; the next run writes fresh data
+                try:
+                    client.write_points(measurements, time_precision="s", database=influx_db)
+                except (InfluxDBClientError, InfluxDBServerError, requests.exceptions.RequestException) as error:
+                    log.error(f"Cannot write to InfluxDB for station {station_name}: {error}")
         except (json.decoder.JSONDecodeError, requests.exceptions.JSONDecodeError) as error:
             log.error(f"JSON Decode Error. Retry in {interval} second(s)...")
             log.debug(error)
@@ -288,5 +293,8 @@ if __name__ == "__main__":
         except NetatmoAuthError as error:
             log.error(f"Auth Error. Retry in {interval} second(s)...")
             log.debug(error)
+        except Exception:
+            # last resort: keep the loop alive and log the traceback
+            log.exception(f"Unexpected error. Retry in {interval} second(s)...")
         finally:
             sleep(interval)
