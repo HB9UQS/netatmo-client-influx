@@ -28,6 +28,15 @@ The client runs as a long-lived process. Every `interval` seconds it
 2. calls `getstationsdata` for all stations of your account,
 3. writes one point per sensor value to InfluxDB.
 
+It is built to keep running unattended:
+
+- A failed write (InfluxDB down, database missing, …) is logged and retried with the next run.
+- Values the API does not deliver are skipped instead of invalidating the whole write.
+- An unreachable station or module still gets its status written (`reachable` = `false`), so outages
+  show up in Grafana.
+- If Netatmo rejects the access token, it is refreshed once and the request is repeated.
+- `SIGTERM` and `SIGINT` (e.g. `docker stop`, Ctrl+C) end the client within about a second.
+
 ## Prerequisites
 
 - Python 3.12 and [uv](https://docs.astral.sh/uv/), or Docker
@@ -84,15 +93,15 @@ By default the file is read from next to `client.py`. Use `-c /path/to/config.ya
 | `INFLUX_HOST`           | `influx.influx_host`     | `localhost` |
 | `INFLUX_PORT`           | `influx.influx_port`     | `8086`      |
 | `INFLUX_DB`             | `influx.influx_db`       | `netatmo`   |
-| `INFLUX_SSL`            | `influx.influx_ssl`      | see below   |
+| `INFLUX_SSL`            | `influx.influx_ssl`      | off (HTTP)  |
 | `INFLUX_USERNAME`       | `influx.influx_username` | `user`      |
 | `INFLUX_PASSWORD`       | `influx.influx_password` | `pass`      |
 
 The InfluxDB defaults only apply when an `influx:` section exists in the config file.
 When you configure everything through environment variables, set all `INFLUX_*` variables.
 
-**SSL:** the connection is currently always plain HTTP. `influx_ssl` is passed on as a string, and the
-`influxdb` client only switches to HTTPS for a real boolean `True`.
+**SSL:** set `INFLUX_SSL` / `influx_ssl` to `true` (also accepted: `1`, `yes`, `y`, `on`) to connect via
+HTTPS. Any other value, including an empty one, means plain HTTP.
 
 ### Command line
 
@@ -110,8 +119,9 @@ directory) and prefers it over the configured refresh token.
 
 - The directory must exist and be writable by the user running the client.
 - The refresh token from the config is only used while no token file exists.
-- If the token file is lost and the configured refresh token is outdated, generate a new one in the
-  Netatmo developer console.
+- If the refresh token has expired, the log says so ("Refresh token expired. …"). Generate a new one in
+  the Netatmo developer console, set it as `NETATMO_REFRESH_TOKEN` and **delete the token file**,
+  otherwise the expired token in the file keeps taking precedence.
 
 ## Running
 
@@ -157,16 +167,21 @@ services:
       - INFLUX_USERNAME=netatmo
       - INFLUX_PASSWORD=change-me-too
     volumes:
-      - ./data:/app/data
+      - netatmo-data:/app/data
     depends_on:
       - influxdb
 
 volumes:
   influxdb:
+  netatmo-data:
 ```
 
-The container runs as UID `10001`. Make sure `./data` is writable for it, e.g.
-`mkdir data && sudo chown 10001 data`, otherwise the token file cannot be saved.
+The token file lives in the named volume `netatmo-data`, which is writable for the container user
+(UID `10001`) without further setup. If you prefer a bind mount such as `./data:/app/data`, make the
+directory writable for that user first: `mkdir data && sudo chown 10001 data`.
+
+The image is built with `uv sync --locked` and starts with `uv run --no-sync`, so the container never
+resolves or downloads packages at runtime. `docker stop` ends it cleanly.
 
 `docker-compose-dev.yml` builds the image from source for local development.
 
@@ -177,13 +192,20 @@ Every value becomes its own measurement with a single field `value`:
 | Measurements                                                 | Tags                                |
 | ------------------------------------------------------------ | ----------------------------------- |
 | Sensor values: `temperature`, `humidity`, `pressure`, `absolutepressure`, `co2`, `noise`, `rain`, `sum_rain_1`, `sum_rain_24`, `windstrength`, `windangle`, `guststrength`, `gustangle`, `min_temp`, `max_temp`, `max_wind_str`, `temp_trend`, `pressure_trend`, … | `home`, `station`, `module`, `type` |
-| Device status: `rf_status` (also the base station's Wi-Fi signal), `battery_percent`, `battery_vp`, `reachable`, `co2_calibrating` | `home`, `station`, `module`, `type` |
+| Device status: `reachable` (base station and modules), `rf_status` (also the base station's Wi-Fi signal), `battery_percent`, `battery_vp`, `co2_calibrating` | `home`, `station`, `module`, `type` |
 | Station location: `altitude`, `latitude`, `longitude`, `country`, `city`, `timezone` | `home`, `station`, `type`           |
 
 Which measurements exist depends on your modules; the client writes whatever the API returns.
 Sensor values carry the measurement time reported by Netatmo (second precision); `min_temp`, `max_temp`
 and `max_wind_str` are stored at the time the extreme occurred. Station location values are stamped with
-the time of the run.
+the time of the run. When a station or module is unreachable, the API sends no readings for it; only its
+status values are written, also stamped with the time of the run.
+
+To spot outages, e.g. a module whose battery died:
+
+```sql
+SELECT last("value") FROM "reachable" GROUP BY "station", "module"
+```
 
 Example query:
 
@@ -200,9 +222,22 @@ Then import the dashboard and select that datasource.
 
 ## Development
 
-- Code style is checked with [ruff](https://docs.astral.sh/ruff/) on every pull request
-  (`ruff check` and `ruff format --check`).
-- Pushes to `main` and version tags `v*` build and publish the Docker image.
+Every push to `main`, every version tag and every pull request runs the `check` job in
+`.github/workflows/build.yml` (syntax, ruff, tests). The Docker image is only built when it passes.
+To run the same checks locally:
+
+```bash
+python -m compileall -q src tests
+uvx ruff@0.17.3 check src tests
+uvx ruff@0.17.3 format --check src tests
+uv run --locked --with pytest pytest
+```
+
+- Pushes to `main` and version tags `v*` publish the Docker image.
+- After changing `pyproject.toml`, even just the version, run `uv lock` and commit `uv.lock` with it.
+  CI and the image build use `--locked` and fail if the two do not match.
+- ruff skips some checks on Windows, e.g. whether a file with a shebang is executable. A local run on
+  Windows can pass while CI on Linux fails.
 
 ## Credits
 
