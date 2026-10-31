@@ -28,7 +28,9 @@ jobs:
       - name: Syntax
         run: python3 -m compileall -q src tests
       - name: Lint
-        run: uvx ruff@0.15.7 check src tests
+        run: uvx ruff@0.17.3 check src tests
+      - name: Format
+        run: uvx ruff@0.17.3 format --check --diff src tests
       - name: Tests
         # --locked fails if uv.lock no longer matches pyproject.toml
         run: uv run --locked --with pytest pytest

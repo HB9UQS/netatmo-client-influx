@@ -1,28 +1,27 @@
 #!/usr/bin/env python3
-# encoding=utf-8
 
 import argparse
 import json
 import logging
 import signal
+import sys
 from datetime import UTC, datetime
 from enum import Enum
 from os import getenv
 from pathlib import Path
 from time import sleep
-from typing import Dict, Optional, Union
 
 import requests
 import yaml
 
-#V1
+# V1
 from influxdb import InfluxDBClient
 from influxdb.exceptions import InfluxDBClientError, InfluxDBServerError
-#v2
-#from influxdb_client import InfluxDBClient, WritePrecision
-#from influxdb_client.client.exceptions import InfluxDBError
-#
 
+# v2
+# from influxdb_client import InfluxDBClient, WritePrecision
+# from influxdb_client.client.exceptions import InfluxDBError
+#
 from helpers import configure_logging
 from netatmo_api import (
     NetatmoAPI,
@@ -38,7 +37,8 @@ class VerbosityLevel(Enum):
     INFO = 2
     DEBUG = 3
 
-def parse_config(_config_file=None) -> Dict:
+
+def parse_config(_config_file=None) -> dict:
     if _config_file is None:
         _config_file = Path(__file__).parent / "config.yaml"
 
@@ -52,7 +52,7 @@ def parse_config(_config_file=None) -> Dict:
             _mark = _error.problem_mark
             print("Error in configuration")
             print(f"Error position: ({_mark.line + 1}:{_mark.column + 1})")
-        exit(1)
+        sys.exit(1)
     else:
         return _config
 
@@ -67,14 +67,14 @@ def parse_args():
     return parser.parse_args()
 
 
-def safe_list_get(_input_list: list, _idx: int, _default=None) -> Optional[str | int | float]:
+def safe_list_get(_input_list: list, _idx: int, _default=None) -> str | int | float | None:
     try:
         return _input_list[_idx]
     except IndexError:
         return _default
 
 
-def check_value(_val: Union[float, int, str]) -> Union[float, str]:
+def check_value(_val: float | str) -> float | str:
     if type(_val) is int:
         return float(_val)
     return _val
@@ -158,16 +158,16 @@ if __name__ == "__main__":
     if "influx" in config:
         influx_host = config.get("influx").get("influx_host", "localhost")
         influx_port = config.get("influx").get("influx_port", "8086")
-# v1
-        influx_db = config.get("influx").get("influx_db","netatmo")
-        influx_ssl = config.get("influx").get("influx_ssl","n")
-        influx_username = config.get("influx").get("influx_username","user")
-        influx_password = config.get("influx").get("influx_password","pass")
-#
-#        influx_bucket = config.get("influx").get("influx_bucket", "netatmo")
-#        influx_protocol = config.get("influx").get("influx_protocol", "http")
-#        influx_token = config.get("influx").get("influx_token", None)
-#        influx_org = config.get("influx").get("influx_org", None)
+        # v1
+        influx_db = config.get("influx").get("influx_db", "netatmo")
+        influx_ssl = config.get("influx").get("influx_ssl", "n")
+        influx_username = config.get("influx").get("influx_username", "user")
+        influx_password = config.get("influx").get("influx_password", "pass")
+    #
+    #        influx_bucket = config.get("influx").get("influx_bucket", "netatmo")
+    #        influx_protocol = config.get("influx").get("influx_protocol", "http")
+    #        influx_token = config.get("influx").get("influx_token", None)
+    #        influx_org = config.get("influx").get("influx_org", None)
 
     # Environment Variables takes precedence over config if set
     # global
@@ -182,16 +182,16 @@ if __name__ == "__main__":
     # influx
     influx_host = getenv("INFLUX_HOST", influx_host)
     influx_port = getenv("INFLUX_PORT", influx_port)
-#v1
+    # v1
     influx_db = getenv("INFLUX_DB", influx_db)
     influx_ssl = getenv("INFLUX_SSL", influx_ssl)
     influx_username = getenv("INFLUX_USERNAME", influx_username)
     influx_password = getenv("INFLUX_PASSWORD", influx_password)
-#
-#    influx_bucket = getenv("INFLUX_BUCKET", influx_bucket)
-#    influx_protocol = getenv("INFLUX_PROTOCOL", influx_protocol)
- #   influx_token = getenv("INFLUX_TOKEN", influx_token)
- #   influx_org = getenv("INFLUX_ORG", influx_org)
+    #
+    #    influx_bucket = getenv("INFLUX_BUCKET", influx_bucket)
+    #    influx_protocol = getenv("INFLUX_PROTOCOL", influx_protocol)
+    #   influx_token = getenv("INFLUX_TOKEN", influx_token)
+    #   influx_org = getenv("INFLUX_ORG", influx_org)
 
     # set logging level
     logger = logging.getLogger(__name__)
@@ -211,17 +211,16 @@ if __name__ == "__main__":
             api.get_stations_data()
             stations = api.get_stations()
 
-#v1
+            # v1
             client = InfluxDBClient(
                 host=influx_host,
                 port=influx_port,
                 username=influx_username,
                 password=influx_password,
                 database=influx_db,
-                ssl=influx_ssl
+                ssl=influx_ssl,
             )
-#
-            for station_id, station in stations.items():
+            for station in stations.values():
                 measurements = []
 
                 log.debug(f"Station Data: {station}")
@@ -231,7 +230,7 @@ if __name__ == "__main__":
                 station_module_type = station.get("type", "Unknown")
                 station_place = station.get("place", {})
                 station_long_lat = station_place.get("location", [])
-   
+
                 station_data = {
                     "altitude": station_place.get("altitude"),
                     "country": station_place.get("country", "Unknown"),
@@ -252,7 +251,7 @@ if __name__ == "__main__":
                             "time": int(datetime.now(UTC).timestamp()),
                         }
                     )
-                
+
                 station_sensor_data = station.get("dashboard_data")
 
                 if station_sensor_data is None:
@@ -262,11 +261,11 @@ if __name__ == "__main__":
 
                 for sensor in ["wifi_status", "reachable", "co2_calibrating"]:
                     station_sensor_data.update({sensor: station.get(sensor)})
-                
+
                 measurements += get_sensor_data(
                     station_sensor_data, home_name, station_name, station_module_name, station_module_type
                 )
-                
+
                 for module in station.get("modules", []):
                     log.debug(f"Module Data: {module}")
                     module_name = module.get("module_name")
@@ -280,7 +279,7 @@ if __name__ == "__main__":
 
                     for sensor in ["rf_status", "battery_vp", "battery_percent", "reachable"]:
                         module_sensor_data.update({sensor: module.get(sensor)})
-  
+
                     measurements += get_sensor_data(
                         module_sensor_data, home_name, station_name, module_name, module_type
                     )

@@ -63,7 +63,7 @@ def test_valid_token_is_used_without_refresh(token_file):
 def test_expired_token_is_refreshed_before_the_call(tmp_path):
     path = tmp_path / "token.json"
     path.write_text(json.dumps({"access_token": "old", "refresh_token": "ref0", "expires_at": time.time() - 5}))
-    api, calls = run(str(path), [token(1), OK])
+    _api, calls = run(str(path), [token(1), OK])
     assert calls == ["token", "getstationsdata"]
     saved = json.loads(path.read_text())
     assert saved["access_token"] == "acc1"

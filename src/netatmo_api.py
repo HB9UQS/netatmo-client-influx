@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# encoding=utf-8
 """
 Implements OAuth2 token refresh and weather station data fetching.
 """
@@ -7,7 +6,7 @@ Implements OAuth2 token refresh and weather station data fetching.
 import json
 import logging
 import time
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import requests
 from requests import Response
@@ -24,31 +23,21 @@ NETATMO_STATIONS_DATA_ENDPOINT = f"{NETATMO_API_BASE_URL}/getstationsdata"
 class NetatmoAuthError(Exception):
     """Base exception for Netatmo authentication errors."""
 
-    pass
-
 
 class NetatmoAuthErrorTokenExpired(Exception):
     """Exception raised when Netatmo refresh token is expired."""
-
-    pass
 
 
 class NetatmoAccessTokenInvalid(NetatmoAuthError):
     """Exception raised when the API rejects the access token as invalid or expired."""
 
-    pass
-
 
 class NetatmoAPIError(Exception):
     """Base exception for Netatmo API errors."""
 
-    pass
-
 
 class NetatmoThrottlingError(NetatmoAPIError):
     """Exception raised when API throttling occurs."""
-
-    pass
 
 
 class NetatmoAuth:
@@ -77,8 +66,8 @@ class NetatmoAuth:
         self.client_secret = client_secret
         self.token_file = token_file
         self.refresh_token = refresh_token
-        self.access_token: Optional[str] = None
-        self.token_expires_at: Optional[float] = None
+        self.access_token: str | None = None
+        self.token_expires_at: float | None = None
 
         try:
             with open(self.token_file, "r+") as _f:
@@ -89,7 +78,7 @@ class NetatmoAuth:
         except (FileNotFoundError, json.JSONDecodeError):
             self.log.info("No existing token file found, will create a new one upon refresh.")
 
-    def refresh(self) -> Tuple[str, str, Optional[int]]:
+    def refresh(self) -> tuple[str, str, int | None]:
         """
         Refresh the OAuth2 access token using the refresh token.
 
@@ -154,7 +143,7 @@ class NetatmoAuth:
             raise NetatmoAuthError(f"Failed to refresh token: {e}") from e
 
     @property
-    def headers(self) -> Dict[str, str]:
+    def headers(self) -> dict[str, str]:
         """Get authorization headers for API requests."""
         # Check if token is expired or expires within 60 seconds
         time_until_expiration = float("inf")
@@ -187,10 +176,10 @@ class NetatmoWeatherStationAPI:
         """
         self.log = log
         self.auth = auth
-        self.stations_data: Dict[str, Any] = {}
-        self.stations_status: Dict[str, Any] = {}
+        self.stations_data: dict[str, Any] = {}
+        self.stations_status: dict[str, Any] = {}
 
-    def get_stations_data(self) -> Dict[str, Any]:
+    def get_stations_data(self) -> dict[str, Any]:
         """
         Fetch station topology data.
 
@@ -231,17 +220,17 @@ class NetatmoWeatherStationAPI:
         except requests.exceptions.RequestException as e:
             raise NetatmoAPIError(f"Failed to fetch stations data: {e}") from e
 
-    def get_stations(self) -> Dict[str, Dict[str, Any]]:
+    def get_stations(self) -> dict[str, dict[str, Any]]:
         """
         Parse station data and return weather stations.
 
         Returns:
             Dictionary mapping station IDs to station data
         """
-        stations: Dict[str, Dict[str, Any]] = {}
+        stations: dict[str, dict[str, Any]] = {}
 
         for station in self.stations_data:
-            station_dict: Dict[str, Any] = station if isinstance(station, dict) else {}
+            station_dict: dict[str, Any] = station if isinstance(station, dict) else {}
             station_id = station_dict.get("_id")
             if station_id:
                 stations[station_id] = {
@@ -267,7 +256,7 @@ class NetatmoWeatherStationAPI:
                 continue
 
             for module in station_dict.get("modules", []):
-                module_dict: Dict[str, Any] = module if isinstance(module, dict) else {}
+                module_dict: dict[str, Any] = module if isinstance(module, dict) else {}
                 if module_dict.get("type") in ["NAMain", "NAWifiStation"]:
                     continue
 
