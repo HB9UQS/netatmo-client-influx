@@ -3,7 +3,14 @@
 import pytest
 from influxdb.line_protocol import make_lines
 
-from client import get_sensor_data, to_bool
+from client import get_sensor_data, short, to_bool
+
+
+def test_short_keeps_one_line_and_limits_length():
+    assert short(ValueError("API request failed\n  with status 500")) == "API request failed with status 500"
+    long_text = short(ValueError("<html>" + "x" * 1000 + "</html>"))
+    assert len(long_text) == 300
+    assert long_text.endswith("...")
 
 
 @pytest.mark.parametrize("value", [True, "true", "True", "1", "yes", "y", "on"])

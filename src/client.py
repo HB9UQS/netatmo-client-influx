@@ -80,6 +80,12 @@ def to_bool(_val) -> bool:
     return str(_val).strip().lower() in ("1", "true", "yes", "y", "on")
 
 
+def short(_error: Exception, _limit: int = 300) -> str:
+    # one line, at most _limit characters
+    _text = " ".join(str(_error).split())
+    return _text if len(_text) <= _limit else _text[: _limit - 3] + "..."
+
+
 stop = threading.Event()
 
 
@@ -282,18 +288,15 @@ if __name__ == "__main__":
                     client.write_points(measurements, time_precision="s", database=influx_db)
                 except (InfluxDBClientError, InfluxDBServerError, requests.exceptions.RequestException) as error:
                     log.error(f"Cannot write to InfluxDB for station {station_name}: {error}")
+        # the cause goes into the error line; API errors can carry a whole HTML page, so it is shortened
         except (json.decoder.JSONDecodeError, requests.exceptions.JSONDecodeError) as error:
-            log.error(f"JSON Decode Error. Retry in {interval} second(s)...")
-            log.debug(error)
+            log.error(f"JSON Decode Error: {short(error)}. Retry in {interval} second(s)...")
         except NetatmoThrottlingError as error:
-            log.error(f"API Throttling. Retry in {interval} second(s)...")
-            log.debug(error)
+            log.error(f"API Throttling: {short(error)}. Retry in {interval} second(s)...")
         except NetatmoAPIError as error:
-            log.error(f"API Error. Retry in {interval} second(s)...")
-            log.debug(error)
+            log.error(f"API Error: {short(error)}. Retry in {interval} second(s)...")
         except NetatmoAuthError as error:
-            log.error(f"Auth Error. Retry in {interval} second(s)...")
-            log.debug(error)
+            log.error(f"Auth Error: {short(error)}. Retry in {interval} second(s)...")
         except NetatmoAuthErrorTokenExpired:
             log.error(
                 "Refresh token expired. Generate a new one in the Netatmo developer console, set it as "
