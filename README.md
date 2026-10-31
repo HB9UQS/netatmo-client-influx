@@ -207,4 +207,4 @@ Then import the dashboard and select that datasource.
 ## Credits
 
 Original project by Dennis Bernardy: [karaktaka/netatmo-client-influx](https://github.com/karaktaka/netatmo-client-influx).
-A Prometheus variant is available as [netatmo-exporter](https://github.com/karaktaka/netatmo-exporter).
+
