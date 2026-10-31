@@ -15,8 +15,26 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  check:
+    name: Check Code
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+      - name: Syntax
+        run: python3 -m compileall -q src tests
+      - name: Lint
+        run: uvx ruff@0.15.7 check src tests
+      - name: Tests
+        run: uv run --frozen --with pytest pytest
+
   build:
     name: Build and Push Image
+    needs: check
     runs-on: ubuntu-latest
     permissions:
       contents: read

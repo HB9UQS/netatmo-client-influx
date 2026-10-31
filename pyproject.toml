@@ -18,3 +18,7 @@ line-length = 120
 
 [tool.ruff.format]
 line-ending = "lf"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
